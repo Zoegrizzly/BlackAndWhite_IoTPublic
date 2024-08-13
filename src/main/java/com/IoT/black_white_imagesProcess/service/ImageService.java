@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Base64;
+import java.util.Optional;
 
 @Service
 public class ImageService {
@@ -36,5 +37,23 @@ public class ImageService {
                     return Base64.getEncoder().encodeToString(decompressedData);
                 })
                 .orElseThrow(() -> new RuntimeException("Image not found"));
+    }
+
+    public boolean updateImage(String deviceId, String timestamp, String base64Image) {
+        Optional<ImageData> existingImageOpt = imageDataRepo.findByDeviceIdAndTimestamp(deviceId, timestamp);
+
+        if (existingImageOpt.isPresent()) {
+            ImageData existingImage = existingImageOpt.get();
+
+            byte[] imageData = Base64.getDecoder().decode(base64Image);
+            byte[] compressedData = compressionService.compressImageRLE(imageData);
+
+            existingImage.setImageData(compressedData);
+            imageDataRepo.save(existingImage);
+
+            return true;
+        } else {
+            return false;
+        }
     }
 }

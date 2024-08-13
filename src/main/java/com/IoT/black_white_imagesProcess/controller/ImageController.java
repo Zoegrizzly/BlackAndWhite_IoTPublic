@@ -30,29 +30,16 @@ public class ImageController {
             @RequestParam("timestamp") String timestamp,
             @RequestPart("image") MultipartFile imageFile) {
 
-        try {
-            // First I want to check if the Image is blanck and white
-            BufferedImage bufferedImage = ImageIO.read(imageFile.getInputStream());
-            if (!isBlackAndWhite(bufferedImage)) {
-                return ResponseEntity.status(400).body("Error: The image is not black and white.");
-            }
+        return processImage(deviceId, timestamp, imageFile, false);
+    }
 
-            // Get the ImageData as byte[]
-            byte[] imageData = imageFile.getBytes();
-
-            /*
-            Not necessarily needed for the objective of this exercise. We could use for the complete flow a byte[].
-            But we will be using a JSON format to show the results and base64 is compatible with a lot of formats
-             */
-            String base64Image = Base64.getEncoder().encodeToString(imageData);
-
-            // Save image
-            imageService.saveImages(deviceId, timestamp, base64Image);
-
-            return ResponseEntity.status(201).body("Upload successfully!");
-        } catch (IOException e) {
-            return ResponseEntity.status(500).body("Error processing the image");
-        }
+    @PutMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Re-upload, update and compress image")
+    public ResponseEntity<?> updateImage(
+            @RequestParam("deviceId") String deviceId,
+            @RequestParam("timestamp") String timestamp,
+            @RequestPart("image") MultipartFile imageFile) {
+        return processImage(deviceId, timestamp, imageFile, true);
     }
 
 
@@ -66,6 +53,8 @@ public class ImageController {
             return ResponseEntity.status(404).body("SoRRY No Image founded!");
         }
     }
+
+
 
     //Short function to detect if a image is black and white
     private boolean isBlackAndWhite(BufferedImage image) {
@@ -82,4 +71,44 @@ public class ImageController {
         }
         return true;
     }
+
+    //Save and Actualize images Process
+    private ResponseEntity<?> processImage(
+            String deviceId,
+            String timestamp,
+            MultipartFile imageFile,
+            boolean isUpdate) {
+        try {
+            //First check if the image is black and white
+            BufferedImage bufferedImage = ImageIO.read(imageFile.getInputStream());
+            if (!isBlackAndWhite(bufferedImage)) {
+                return ResponseEntity.status(400).body("Error: The image is not black and white.");
+            }
+
+            // Get the ImageData as byte[]
+            byte[] imageData = imageFile.getBytes();
+
+            /*
+            Not necessarily needed for the objective of this exercise. We could use for the complete flow a byte[].
+            But we will be using a JSON format to show the results and base64 is compatible with a lot of formats
+             */
+            String base64Image = Base64.getEncoder().encodeToString(imageData);
+
+            // Save or update the image according to the falg
+            if (isUpdate) {
+                boolean isUpdated = imageService.updateImage(deviceId, timestamp, base64Image);
+                if (isUpdated) {
+                    return ResponseEntity.status(200).body("Image updated successfully!");
+                } else {
+                    return ResponseEntity.status(404).body("Error: Image not found for the given deviceId and timestamp.");
+                }
+            } else {
+                imageService.saveImages(deviceId, timestamp, base64Image);
+                return ResponseEntity.status(201).body("Upload successfully!");
+            }
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body("Error processing the image");
+        }
+    }
+
 }
